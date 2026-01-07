@@ -1,5 +1,33 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
+
+// localStorage 工具函數
+const STORAGE_KEY = 'mahjong-scores'
+
+const loadFromStorage = () => {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY)
+    if (data) {
+      return JSON.parse(data)
+    }
+  } catch (error) {
+    console.error('讀取 localStorage 失敗:', error)
+  }
+  return {
+    playerOnePoints: 0,
+    playerTwoPoints: 0,
+    playerThreePoints: 0,
+    jackPot: 0
+  }
+}
+
+const saveToStorage = (data) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch (error) {
+    console.error('保存到 localStorage 失敗:', error)
+  }
+}
 
 const winOptions = [6, 7, 8, 9, 10, 11]
 
@@ -139,10 +167,22 @@ function PlayerCard({
 }
 
 function App() {
-  const [playerOnePoints, setPlayerOnePoints] = useState(0)
-  const [playerTwoPoints, setPlayerTwoPoints] = useState(0)
-  const [playerThreePoints, setPlayerThreePoints] = useState(0)
-  const [jackPot, setJackPot] = useState(0)
+  // 從 localStorage 讀取初始數據
+  const savedData = loadFromStorage()
+  const [playerOnePoints, setPlayerOnePoints] = useState(savedData.playerOnePoints)
+  const [playerTwoPoints, setPlayerTwoPoints] = useState(savedData.playerTwoPoints)
+  const [playerThreePoints, setPlayerThreePoints] = useState(savedData.playerThreePoints)
+  const [jackPot, setJackPot] = useState(savedData.jackPot)
+
+  // 當任何分數變化時，保存到 localStorage
+  useEffect(() => {
+    saveToStorage({
+      playerOnePoints,
+      playerTwoPoints,
+      playerThreePoints,
+      jackPot
+    })
+  }, [playerOnePoints, playerTwoPoints, playerThreePoints, jackPot])
 
   const handlePlayerOneDraw = () => {
     // 和：JackPot加30，每位玩家減10
@@ -249,6 +289,16 @@ function App() {
     }
   }
 
+  const handleReset = () => {
+    if (window.confirm('確定要重置所有分數嗎？')) {
+      setPlayerOnePoints(0)
+      setPlayerTwoPoints(0)
+      setPlayerThreePoints(0)
+      setJackPot(0)
+      localStorage.removeItem(STORAGE_KEY)
+    }
+  }
+
   return (
     <div className="App">
       <header className="App-header">
@@ -257,6 +307,9 @@ function App() {
           <span className="jack-pot-label">Jack Pot</span>
           <span className="jack-pot-value">{jackPot}</span>
         </div>
+        <button className="reset-all-btn" onClick={handleReset}>
+          重置所有分數
+        </button>
       </header>
       <section className="players">
         <PlayerCard
