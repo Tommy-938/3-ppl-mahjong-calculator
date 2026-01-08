@@ -20,7 +20,8 @@ const loadFromStorage = () => {
     playerOnePoints: 0,
     playerTwoPoints: 0,
     playerThreePoints: 0,
-    jackPot: 0
+    jackPot: 0,
+    history: []
   }
 }
 
@@ -53,7 +54,6 @@ function PlayerCard({
   playerId,
   otherPlayers,
   onWinSelect,
-  onDrawSelect,
   onRename
 }) {
   const [open, setOpen] = useState(false)
@@ -148,10 +148,11 @@ function PlayerCard({
         <button className="win-btn" onClick={() => setOpen((prev) => !prev)}>
           {open ? '關閉' : '食糊'}
         </button>
+
         {open && (
           <div className="win-list">
             {!winType ? (
-              // 第一步：選擇出銃、自摸或和
+              // 第一步：選擇出銃或自摸
               <>
                 <button
                   className="win-option win-type-btn"
@@ -164,12 +165,6 @@ function PlayerCard({
                   onClick={() => handleWinTypeSelect('自摸')}
                 >
                   自摸
-                </button>
-                <button
-                  className="win-option win-type-btn"
-                  onClick={() => handleWinTypeSelect('和')}
-                >
-                  和
                 </button>
               </>
             ) : winType === '出銃' && selectedPlayer === null ? (
@@ -223,6 +218,23 @@ function App() {
   const [playerThreePoints, setPlayerThreePoints] = useState(savedData.playerThreePoints)
   const [jackPot, setJackPot] = useState(savedData.jackPot)
 
+  // 歷史紀錄：陣列，最近事件放前面
+  const [history, setHistory] = useState(savedData.history || [])
+  const [showHistory, setShowHistory] = useState(false)
+
+  const addHistoryEvent = (event) => {
+    setHistory((prev) => [{ ...event }, ...prev])
+  }
+
+  // 全域確認 modal 設定：{ title, message(JSX or string), onConfirm }
+  const [confirmConfig, setConfirmConfig] = useState(null)
+
+  const closeConfirm = () => setConfirmConfig(null)
+
+  const openConfirm = ({ title, message, onConfirm }) => {
+    setConfirmConfig({ title, message, onConfirm })
+  }
+
   // 當任何分數變化時，保存到 localStorage
   useEffect(() => {
     saveToStorage({
@@ -232,16 +244,49 @@ function App() {
       playerOnePoints,
       playerTwoPoints,
       playerThreePoints,
-      jackPot
+      jackPot,
+      history
     })
-  }, [playerOneName, playerTwoName, playerThreeName, playerOnePoints, playerTwoPoints, playerThreePoints, jackPot])
+  }, [playerOneName, playerTwoName, playerThreeName, playerOnePoints, playerTwoPoints, playerThreePoints, jackPot, history])
 
-  const handlePlayerOneDraw = () => {
-    // 和：JackPot加30，每位玩家減10
+  const doGlobalDraw = () => {
     setJackPot((prev) => prev + 30)
     setPlayerOnePoints((prev) => prev - 10)
     setPlayerTwoPoints((prev) => prev - 10)
     setPlayerThreePoints((prev) => prev - 10)
+
+    addHistoryEvent({
+      timestamp: new Date().toISOString(),
+      action: 'draw',
+      actorId: null,
+      actorName: '和牌',
+      details: '和',
+      changes: [
+        { playerId: 1, name: playerOneName, delta: -10 },
+        { playerId: 2, name: playerTwoName, delta: -10 },
+        { playerId: 3, name: playerThreeName, delta: -10 }
+      ],
+      jackPotChange: 30
+    })
+  }
+
+  const handleGlobalDraw = () => {
+    openConfirm({
+      title: '確認宣告和牌',
+      message: (
+        <div>
+          <p>此操作會：</p>
+          <ul style = {{listStyleType: "none"}}>
+            <li>Jack Pot +30</li>
+            <li>所有玩家各 -10</li>
+          </ul>
+        </div>
+      ),
+      onConfirm: () => {
+        doGlobalDraw()
+        closeConfirm()
+      }
+    })
   }
 
   const handlePlayerOneWin = (fan, winType, selectedPlayerId) => {
@@ -262,22 +307,45 @@ function App() {
       } else if (selectedPlayerId === 3) {
         setPlayerThreePoints((prev) => prev - points)
       }
+
+      addHistoryEvent({
+        timestamp: new Date().toISOString(),
+        action: 'win',
+        actorId: 1,
+        actorName: playerOneName,
+        winType,
+        fan,
+        changes: [
+          { playerId: 1, name: playerOneName, delta: points + jackPotBonus },
+          { playerId: selectedPlayerId, name: selectedPlayerId === 2 ? playerTwoName : playerThreeName, delta: -points }
+        ],
+        jackPotBonus
+      })
     } else if (winType === '自摸') {
       // 自摸：玩家1加分，其他2個玩家各扣分/2
       setPlayerOnePoints((prev) => prev + points + jackPotBonus)
       const pointsToDeduct = points / 2
       setPlayerTwoPoints((prev) => prev - pointsToDeduct)
       setPlayerThreePoints((prev) => prev - pointsToDeduct)
+
+      addHistoryEvent({
+        timestamp: new Date().toISOString(),
+        action: 'win',
+        actorId: 1,
+        actorName: playerOneName,
+        winType,
+        fan,
+        changes: [
+          { playerId: 1, name: playerOneName, delta: points + jackPotBonus },
+          { playerId: 2, name: playerTwoName, delta: -points / 2 },
+          { playerId: 3, name: playerThreeName, delta: -points / 2 }
+        ],
+        jackPotBonus
+      })
     }
   }
 
-  const handlePlayerTwoDraw = () => {
-    // 和：JackPot加30，每位玩家減10
-    setJackPot((prev) => prev + 30)
-    setPlayerOnePoints((prev) => prev - 10)
-    setPlayerTwoPoints((prev) => prev - 10)
-    setPlayerThreePoints((prev) => prev - 10)
-  }
+
 
   const handlePlayerTwoWin = (fan, winType, selectedPlayerId) => {
     const points = getPointsFromFan(fan)
@@ -297,22 +365,45 @@ function App() {
       } else if (selectedPlayerId === 3) {
         setPlayerThreePoints((prev) => prev - points)
       }
+
+      addHistoryEvent({
+        timestamp: new Date().toISOString(),
+        action: 'win',
+        actorId: 2,
+        actorName: playerTwoName,
+        winType,
+        fan,
+        changes: [
+          { playerId: 2, name: playerTwoName, delta: points + jackPotBonus },
+          { playerId: selectedPlayerId, name: selectedPlayerId === 1 ? playerOneName : playerThreeName, delta: -points }
+        ],
+        jackPotBonus
+      })
     } else if (winType === '自摸') {
       // 自摸：玩家2加分，其他2個玩家各扣分/2
       setPlayerTwoPoints((prev) => prev + points + jackPotBonus)
       const pointsToDeduct = points / 2
       setPlayerOnePoints((prev) => prev - pointsToDeduct)
       setPlayerThreePoints((prev) => prev - pointsToDeduct)
+
+      addHistoryEvent({
+        timestamp: new Date().toISOString(),
+        action: 'win',
+        actorId: 2,
+        actorName: playerTwoName,
+        winType,
+        fan,
+        changes: [
+          { playerId: 2, name: playerTwoName, delta: points + jackPotBonus },
+          { playerId: 1, name: playerOneName, delta: -points / 2 },
+          { playerId: 3, name: playerThreeName, delta: -points / 2 }
+        ],
+        jackPotBonus
+      })
     }
   }
 
-  const handlePlayerThreeDraw = () => {
-    // 和：JackPot加30，每位玩家減10
-    setJackPot((prev) => prev + 30)
-    setPlayerOnePoints((prev) => prev - 10)
-    setPlayerTwoPoints((prev) => prev - 10)
-    setPlayerThreePoints((prev) => prev - 10)
-  }
+
 
   const handlePlayerThreeWin = (fan, winType, selectedPlayerId) => {
     const points = getPointsFromFan(fan)
@@ -332,26 +423,63 @@ function App() {
       } else if (selectedPlayerId === 2) {
         setPlayerTwoPoints((prev) => prev - points)
       }
+
+      addHistoryEvent({
+        timestamp: new Date().toISOString(),
+        action: 'win',
+        actorId: 3,
+        actorName: playerThreeName,
+        winType,
+        fan,
+        changes: [
+          { playerId: 3, name: playerThreeName, delta: points + jackPotBonus },
+          { playerId: selectedPlayerId, name: selectedPlayerId === 1 ? playerOneName : playerTwoName, delta: -points }
+        ],
+        jackPotBonus
+      })
     } else if (winType === '自摸') {
       // 自摸：玩家3加分，其他2個玩家各扣分/2
       setPlayerThreePoints((prev) => prev + points + jackPotBonus)
       const pointsToDeduct = points / 2
       setPlayerOnePoints((prev) => prev - pointsToDeduct)
       setPlayerTwoPoints((prev) => prev - pointsToDeduct)
+
+      addHistoryEvent({
+        timestamp: new Date().toISOString(),
+        action: 'win',
+        actorId: 3,
+        actorName: playerThreeName,
+        winType,
+        fan,
+        changes: [
+          { playerId: 3, name: playerThreeName, delta: points + jackPotBonus },
+          { playerId: 1, name: playerOneName, delta: -points / 2 },
+          { playerId: 2, name: playerTwoName, delta: -points / 2 }
+        ],
+        jackPotBonus
+      })
     }
   }
 
+  const doReset = () => {
+    setPlayerOneName('玩家 1')
+    setPlayerTwoName('玩家 2')
+    setPlayerThreeName('玩家 3')
+    setPlayerOnePoints(0)
+    setPlayerTwoPoints(0)
+    setPlayerThreePoints(0)
+    setJackPot(0)
+    setHistory([])
+    localStorage.removeItem(STORAGE_KEY)
+    closeConfirm()
+  }
+
   const handleReset = () => {
-    if (window.confirm('確定要重置所有分數嗎？')) {
-      setPlayerOneName('玩家 1')
-      setPlayerTwoName('玩家 2')
-      setPlayerThreeName('玩家 3')
-      setPlayerOnePoints(0)
-      setPlayerTwoPoints(0)
-      setPlayerThreePoints(0)
-      setJackPot(0)
-      localStorage.removeItem(STORAGE_KEY)
-    }
+    openConfirm({
+      title: '確認重置',
+      message: '確定要重置所有分數嗎？ 此操作會清除所有分數與歷史紀錄。',
+      onConfirm: () => doReset()
+    })
   }
 
   return (
@@ -362,10 +490,83 @@ function App() {
           <span className="jack-pot-label">Jack Pot</span>
           <span className="jack-pot-value">{jackPot}</span>
         </div>
-        <button className="reset-all-btn" onClick={handleReset}>
-          重置所有分數
-        </button>
+        <div className="header-actions">
+          <button className="history-btn action-btn" onClick={() => setShowHistory(true)}>歷史紀錄</button>
+          <button className="draw-btn header-draw-btn action-btn" onClick={handleGlobalDraw}>和</button>
+          <button className="reset-all-btn action-btn" onClick={handleReset}>
+            重置所有分數
+          </button>
+        </div>
       </header>
+
+      {confirmConfig && (
+        <div className="confirm-overlay" onClick={closeConfirm}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-title">{confirmConfig.title}</div>
+            <div className="confirm-message">{confirmConfig.message}</div>
+            <div className="confirm-actions">
+              <button className="confirm-btn confirm-cancel" onClick={closeConfirm}>取消</button>
+              <button
+                className="confirm-btn confirm-confirm"
+                onClick={() => {
+                  if (confirmConfig && typeof confirmConfig.onConfirm === 'function') {
+                    confirmConfig.onConfirm()
+                  }
+                }}
+              >
+                確定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showHistory && (
+        <div className="history-modal-overlay" onClick={() => setShowHistory(false)}>
+          <div className="history-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>歷史紀錄</h3>
+            <div className="history-controls">
+              <button className="history-clear-btn action-btn" onClick={() => openConfirm({ title: '確認清除歷史', message: '確定要清除所有歷史紀錄嗎？此操作無法回復。', onConfirm: () => { setHistory([]); closeConfirm(); } })}>清除歷史</button>
+              <button className="history-close-btn action-btn" onClick={() => setShowHistory(false)}>關閉</button>
+            </div>
+            <div className="history-list">
+              {history.length === 0 ? (
+                <p>目前沒有紀錄</p>
+              ) : (
+                history.map((ev, idx) => (
+                  <div key={idx} className="history-item">
+                    <div className="history-time">{new Date(ev.timestamp).toLocaleString()}</div>
+                    <div className="history-body">
+                      {ev.action === 'draw' ? (
+                        <div>
+                          <strong>和牌</strong>
+                          <ul>
+                            {ev.changes.map((c) => (
+                              <li key={c.playerId}>{c.name}: {c.delta > 0 ? '+' : ''}{c.delta}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : ev.action === 'win' ? (
+                        <div>
+                          <strong>{ev.actorName}</strong> {ev.winType} {ev.fan} 番
+                          <ul>
+                            {ev.changes.map((c) => (
+                              <li key={c.playerId}>{c.name}: {c.delta > 0 ? '+' : ''}{c.delta}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <pre>{JSON.stringify(ev)}</pre>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="players">
         <PlayerCard
           name={playerOneName}
@@ -376,7 +577,6 @@ function App() {
             { id: 3, name: playerThreeName }
           ]}
           onWinSelect={handlePlayerOneWin}
-          onDrawSelect={handlePlayerOneDraw}
           onRename={(newName) => setPlayerOneName(newName)}
         />
         <PlayerCard
@@ -388,7 +588,6 @@ function App() {
             { id: 3, name: playerThreeName }
           ]}
           onWinSelect={handlePlayerTwoWin}
-          onDrawSelect={handlePlayerTwoDraw}
           onRename={(newName) => setPlayerTwoName(newName)}
         />
         <PlayerCard
@@ -400,7 +599,6 @@ function App() {
             { id: 2, name: playerTwoName }
           ]}
           onWinSelect={handlePlayerThreeWin}
-          onDrawSelect={handlePlayerThreeDraw}
           onRename={(newName) => setPlayerThreeName(newName)}
         />
       </section>
