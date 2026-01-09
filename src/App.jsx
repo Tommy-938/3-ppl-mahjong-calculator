@@ -35,14 +35,14 @@ const saveToStorage = (data) => {
 
 const winOptions = [6, 7, 8, 9, 10, 11]
 
-// 番數對應的點數：6番→8點, 7番→16點, 8番→24點, 9番→32點, 10番→64點, 11番→128點
+// 番數對應的點數：6番→16點, 7番→32點, 8番→48點, 9番→64點, 10番→96點, 11番→128點
 const getPointsFromFan = (fan) => {
   const pointMap = {
-    6: 8,
-    7: 16,
-    8: 24,
-    9: 32,
-    10: 64,
+    6: 16,
+    7: 32,
+    8: 48,
+    9: 64,
+    10: 96,
     11: 128
   }
   return pointMap[fan] || 0
@@ -250,10 +250,10 @@ function App() {
   }, [playerOneName, playerTwoName, playerThreeName, playerOnePoints, playerTwoPoints, playerThreePoints, jackPot, history])
 
   const doGlobalDraw = () => {
-    setJackPot((prev) => prev + 30)
-    setPlayerOnePoints((prev) => prev - 10)
-    setPlayerTwoPoints((prev) => prev - 10)
-    setPlayerThreePoints((prev) => prev - 10)
+    setJackPot((prev) => prev + 15)
+    setPlayerOnePoints((prev) => prev - 5)
+    setPlayerTwoPoints((prev) => prev - 5)
+    setPlayerThreePoints((prev) => prev - 5)
 
     addHistoryEvent({
       timestamp: new Date().toISOString(),
@@ -262,9 +262,9 @@ function App() {
       actorName: '和牌',
       details: '和',
       changes: [
-        { playerId: 1, name: playerOneName, delta: -10 },
-        { playerId: 2, name: playerTwoName, delta: -10 },
-        { playerId: 3, name: playerThreeName, delta: -10 }
+        { playerId: 1, name: playerOneName, delta: 5 },
+        { playerId: 2, name: playerTwoName, delta: -5 },
+        { playerId: 3, name: playerThreeName, delta: -5 }
       ],
       jackPotChange: 30
     })
@@ -277,8 +277,8 @@ function App() {
         <div>
           <p>此操作會：</p>
           <ul style = {{listStyleType: "none"}}>
-            <li>Jack Pot +30</li>
-            <li>所有玩家各 -10</li>
+            <li>Jack Pot +15</li>
+            <li>所有玩家各 -5</li>
           </ul>
         </div>
       ),
