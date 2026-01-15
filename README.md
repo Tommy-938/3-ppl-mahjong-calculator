@@ -1,9 +1,8 @@
-# Simple React App
+This is a simple web calculator built with React. Its main function is to calculate points for different players in a 3-player-Mahjong game. It stores the history and states of different players, including their name and points in local storage. Unless you clear the record, states will not be refreshed and disappeared. However, it only supports chinese now. English will be updated if needed.
 
-A simple React application built with Vite.
+Link of Calculator: https://tommy-938.github.io/3-ppl-mahjong-calculator/
 
 ## Getting Started
-
 ### Prerequisites
 
 - Node.js (version 16 or higher)
